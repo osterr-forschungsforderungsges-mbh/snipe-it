@@ -651,7 +651,7 @@
                                                 <strong>
                                                     {{ trans('admin/hardware/form.eol_date') }}
                                                     @if ($asset->purchase_date)
-														{!! $asset->asset_eol_date < date("Y-m-d") ? '<i class="fas fa-exclamation-triangle text-orange" aria-hidden="true"></i>' : '' !!}
+							{!! $asset->asset_eol_date < date("Y-m-d") ? '<i class="fas fa-exclamation-triangle text-orange" aria-hidden="true"></i>' : '' !!}
                                                     @endif
                                                 </strong>
                                             </div>
@@ -872,11 +872,13 @@
 
 
                                     @can('update', $asset)
+                                        @if ($asset->deleted_at=='')
                                         <div class="col-md-12" style="padding-top: 5px;">
                                             <a href="{{ route('hardware.edit', $asset->id) }}" style="width: 100%;" class="btn btn-sm btn-primary hidden-print">
                                                 {{ trans('admin/hardware/general.edit') }}
                                             </a>
                                         </div>
+                                        @endif
                                     @endcan
 
                                     @can('create', $asset)
@@ -988,6 +990,7 @@
                                         <tr>
                                             <th class="col-md-4">{{ trans('general.name') }}</th>
                                             <th class="col-md-4"><span class="line"></span>{{ trans('admin/licenses/form.license_key') }}</th>
+                                            <th class="col-md-4"><span class="line"></span>{{ trans('admin/licenses/form.expiration') }}</th>
                                             <th class="col-md-1"><span class="line"></span>{{ trans('table.actions') }}</th>
                                         </tr>
                                         </thead>
@@ -1002,6 +1005,9 @@
                                                         @else
                                                             ------------
                                                         @endcan
+                                                    </td>
+                                                    <td>
+                                                        {{ Helper::getFormattedDateObject($seat->license->expiration_date, 'date', false) }}
                                                     </td>
                                                     <td>
                                                         <a href="{{ route('licenses.checkin', $seat->id) }}" class="btn btn-sm bg-purple" data-tooltip="true">{{ trans('general.checkin') }}</a>
@@ -1206,15 +1212,18 @@
                 <thead>
                 <tr>
                   <th data-visible="true" data-field="icon" style="width: 40px;" class="hidden-xs" data-formatter="iconFormatter">{{ trans('admin/hardware/table.icon') }}</th>
-                  <th class="col-sm-2" data-visible="true" data-field="action_date" data-formatter="dateDisplayFormatter">{{ trans('general.date') }}</th>
-                  <th class="col-sm-1" data-visible="true" data-field="admin" data-formatter="usersLinkObjFormatter">{{ trans('general.admin') }}</th>
-                  <th class="col-sm-1" data-visible="true" data-field="action_type">{{ trans('general.action') }}</th>
-                  <th class="col-sm-2" data-visible="true" data-field="item" data-formatter="polymorphicItemFormatter">{{ trans('general.item') }}</th>
-                  <th class="col-sm-2" data-visible="true" data-field="target" data-formatter="polymorphicItemFormatter">{{ trans('general.target') }}</th>
-                  <th class="col-sm-2" data-field="note">{{ trans('general.notes') }}</th>
-                  <th class="col-md-3" data-field="signature_file" data-visible="false"  data-formatter="imageFormatter">{{ trans('general.signature') }}</th>
-                  <th class="col-md-3" data-visible="false" data-field="file" data-visible="false"  data-formatter="fileUploadFormatter">{{ trans('general.download') }}</th>
-                  <th class="col-sm-2" data-field="log_meta" data-visible="true" data-formatter="changeLogFormatter">{{ trans('admin/hardware/table.changed')}}</th>
+                  <th data-visible="true" data-field="action_date" data-sortable="true" data-formatter="dateDisplayFormatter">{{ trans('general.date') }}</th>
+                  <th data-visible="true" data-field="admin" data-formatter="usersLinkObjFormatter">{{ trans('general.admin') }}</th>
+                  <th data-visible="true" data-field="action_type">{{ trans('general.action') }}</th>
+                  <th data-visible="true" data-field="item" data-formatter="polymorphicItemFormatter">{{ trans('general.item') }}</th>
+                  <th data-visible="true" data-field="target" data-formatter="polymorphicItemFormatter">{{ trans('general.target') }}</th>
+                  <th data-field="note">{{ trans('general.notes') }}</th>
+                  <th data-field="signature_file" data-visible="false"  data-formatter="imageFormatter">{{ trans('general.signature') }}</th>
+                  <th data-visible="false" data-field="file" data-visible="false"  data-formatter="fileUploadFormatter">{{ trans('general.download') }}</th>
+                   <th data-field="log_meta" data-visible="true" data-formatter="changeLogFormatter">{{ trans('admin/hardware/table.changed')}}</th>
+                   <th data-field="remote_ip" data-visible="false" data-sortable="true">{{ trans('admin/settings/general.login_ip') }}</th>
+                   <th data-field="user_agent" data-visible="false" data-sortable="true">{{ trans('admin/settings/general.login_user_agent') }}</th>
+                   <th data-field="action_source" data-visible="false" data-sortable="true">{{ trans('general.action_source') }}</th>
                 </tr>
                 </thead>
               </table>

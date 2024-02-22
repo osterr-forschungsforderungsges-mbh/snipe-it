@@ -252,6 +252,9 @@ class ReportsController extends Controller
                 trans('general.model_no'),
                 'To',
                 trans('general.notes'),
+                trans('admin/settings/general.login_ip'),
+                trans('admin/settings/general.login_user_agent'),
+                trans('general.action_source'),
                 'Changed',
 
             ];
@@ -292,12 +295,15 @@ class ReportsController extends Controller
                         $actionlog->present()->actionType(),
                         e($actionlog->itemType()),
                         ($actionlog->itemType() == 'user') ? $actionlog->filename : $item_name,
-                        ($actionlog->item->serial) ? $actionlog->item->serial : null,
-                        ($actionlog->item->model) ? htmlspecialchars($actionlog->item->model->name, ENT_NOQUOTES) : null,
-                        ($actionlog->item->model) ? $actionlog->item->model->model_number : null,
+                        ($actionlog->item) ? $actionlog->item->serial : null,
+                        (($actionlog->item) && ($actionlog->item->model)) ? htmlspecialchars($actionlog->item->model->name, ENT_NOQUOTES) : null,
+                        (($actionlog->item) && ($actionlog->item->model))  ? $actionlog->item->model->model_number : null,
                         $target_name,
                         ($actionlog->note) ? e($actionlog->note) : '',
                         $actionlog->log_meta,
+                        $actionlog->remote_ip,
+                        $actionlog->user_agent,
+                        $actionlog->action_source,
                     ];
                     fputcsv($handle, $row);
                 }
@@ -610,7 +616,7 @@ class ReportsController extends Controller
             }
 
             if ($request->filled('url')) {
-                $header[] = trans('admin/manufacturers/table.url');
+                $header[] = trans('general.url');
             }
 
 
@@ -712,10 +718,10 @@ class ReportsController extends Controller
             if ($request->filled('exclude_archived')) {
                 $assets->notArchived();
             }
-            if ($request->input('deleted_assets') == '1') {
+            if ($request->input('deleted_assets') == 'include_deleted') {
                 $assets->withTrashed();
             }
-            if ($request->input('deleted_assets') == '0') {
+            if ($request->input('deleted_assets') == 'only_deleted') {
                 $assets->onlyTrashed();
             }
 

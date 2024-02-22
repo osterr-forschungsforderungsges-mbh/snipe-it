@@ -706,6 +706,13 @@ Route::group(['prefix' => 'v1', 'middleware' => ['api', 'throttle:api']], functi
                 ]
             )->name('api.manufacturers.selectlist');
 
+            Route::post('{id}/restore',
+                [
+                    Api\ManufacturersController::class,
+                    'restore'
+                ]
+            )->name('api.manufacturers.restore');
+
         }); 
     
         Route::resource('manufacturers', 
@@ -741,6 +748,13 @@ Route::group(['prefix' => 'v1', 'middleware' => ['api', 'throttle:api']], functi
                     'assets'
                 ]
             )->name('api.models.assets');
+
+            Route::post('{id}/restore',
+                [
+                    Api\AssetModelsController::class,
+                    'restore'
+                ]
+            )->name('api.models.restore');
 
         }); 
     
@@ -813,6 +827,13 @@ Route::group(['prefix' => 'v1', 'middleware' => ['api', 'throttle:api']], functi
                     'listBackups'
                 ]
             )->name('api.settings.backups.index');
+
+            Route::get('backups/download/latest',
+                [
+                    Api\SettingsController::class,
+                    'downloadLatestBackup'
+                ]
+            )->name('api.settings.backups.latest');
 
             Route::get('backups/download/{file}',
                 [

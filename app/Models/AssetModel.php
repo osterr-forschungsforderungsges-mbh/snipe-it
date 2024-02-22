@@ -6,6 +6,7 @@ use App\Models\Traits\Searchable;
 use App\Presenters\Presentable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Watson\Validating\ValidatingTrait;
 
@@ -44,15 +45,6 @@ class AssetModel extends SnipeModel
      */
     protected $injectUniqueIdentifier = true;
     use ValidatingTrait;
-
-    public function setEolAttribute($value)
-    {
-        if ($value == '') {
-            $value = 0;
-        }
-
-        $this->attributes['eol'] = $value;
-    }
 
     /**
      * The attributes that are mass assignable.
@@ -186,6 +178,21 @@ class AssetModel extends SnipeModel
         }
 
         return false;
+    }
+
+
+    /**
+     * Checks if the model is deletable
+     *
+     * @author A. Gianotto <snipe@snipe.net>
+     * @since [v6.3.4]
+     * @return bool
+     */
+    public function isDeletable()
+    {
+        return Gate::allows('delete', $this)
+            && ($this->assets_count == 0)
+            && ($this->deleted_at == '');
     }
 
     /**

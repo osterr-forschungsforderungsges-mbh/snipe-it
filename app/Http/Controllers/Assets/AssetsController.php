@@ -6,6 +6,7 @@ use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ImageUploadRequest;
 use App\Models\Actionlog;
+use App\Models\Manufacturer;
 use Illuminate\Support\Facades\Log;
 use App\Models\Asset;
 use App\Models\AssetModel;
@@ -130,9 +131,6 @@ class AssetsController extends Controller
             $asset->order_number            = $request->input('order_number');
             $asset->notes                   = $request->input('notes');
             $asset->user_id                 = Auth::id();
-            $asset->archived                = '0';
-            $asset->physical                = '1';
-            $asset->depreciate              = '0';
             $asset->status_id               = request('status_id');
             $asset->warranty_months         = request('warranty_months', null);
             $asset->purchase_cost           = request('purchase_cost');
@@ -148,7 +146,8 @@ class AssetsController extends Controller
                 $asset->next_audit_date = Carbon::now()->addMonths($settings->audit_interval)->toDateString();
             }
 
-            if ($asset->assigned_to == '') {
+            // Set location_id to rtd_location_id ONLY if the asset isn't being checked out
+            if (!request('assigned_user') && !request('assigned_asset') && !request('assigned_location')) {
                 $asset->location_id = $request->input('rtd_location_id', null);
             }
 
@@ -204,8 +203,9 @@ class AssetsController extends Controller
         }
 
         if ($success) {
+            \Log::debug(e($asset->asset_tag));
             return redirect()->route('hardware.index')
-                ->with('success-unescaped', trans('admin/hardware/message.create.success_linked', ['link' => route('hardware.show', $asset->id), 'id', 'tag' => $asset->asset_tag]));
+                ->with('success-unescaped', trans('admin/hardware/message.create.success_linked', ['link' => route('hardware.show', $asset->id), 'id', 'tag' => e($asset->asset_tag)]));
                
       
         }
@@ -363,7 +363,6 @@ class AssetsController extends Controller
         $asset->order_number = $request->input('order_number');
         $asset->asset_tag = $asset_tag[1];
         $asset->notes = $request->input('notes');
-        $asset->physical = '1';
 
         $asset = $request->handleImages($asset);
 
@@ -523,31 +522,33 @@ class AssetsController extends Controller
     public function getBarCode($assetId = null)
     {
         $settings = Setting::getSettings();
-        $asset = Asset::find($assetId);
-        $barcode_file = public_path().'/uploads/barcodes/'.str_slug($settings->alt_barcode).'-'.str_slug($asset->asset_tag).'.png';
+        if ($asset = Asset::withTrashed()->find($assetId)) {
+            $barcode_file = public_path().'/uploads/barcodes/'.str_slug($settings->alt_barcode).'-'.str_slug($asset->asset_tag).'.png';
 
-        if (isset($asset->id, $asset->asset_tag)) {
-            if (file_exists($barcode_file)) {
-                $header = ['Content-type' => 'image/png'];
+            if (isset($asset->id, $asset->asset_tag)) {
+                if (file_exists($barcode_file)) {
+                    $header = ['Content-type' => 'image/png'];
 
-                return response()->file($barcode_file, $header);
-            } else {
-                // Calculate barcode width in pixel based on label width (inch)
-                $barcode_width = ($settings->labels_width - $settings->labels_display_sgutter) * 200.000000000001;
+                    return response()->file($barcode_file, $header);
+                } else {
+                    // Calculate barcode width in pixel based on label width (inch)
+                    $barcode_width = ($settings->labels_width - $settings->labels_display_sgutter) * 200.000000000001;
 
-                $barcode = new \Com\Tecnick\Barcode\Barcode();
-                try {
-                    $barcode_obj = $barcode->getBarcodeObj($settings->alt_barcode, $asset->asset_tag, ($barcode_width < 300 ? $barcode_width : 300), 50);
-                    file_put_contents($barcode_file, $barcode_obj->getPngData());
+                    $barcode = new \Com\Tecnick\Barcode\Barcode();
+                    try {
+                        $barcode_obj = $barcode->getBarcodeObj($settings->alt_barcode, $asset->asset_tag, ($barcode_width < 300 ? $barcode_width : 300), 50);
+                        file_put_contents($barcode_file, $barcode_obj->getPngData());
 
-                    return response($barcode_obj->getPngData())->header('Content-type', 'image/png');
-                } catch (\Exception $e) {
-                    Log::debug('The barcode format is invalid.');
+                        return response($barcode_obj->getPngData())->header('Content-type', 'image/png');
+                    } catch (\Exception $e) {
+                        Log::debug('The barcode format is invalid.');
 
-                    return response(file_get_contents(public_path('uploads/barcodes/invalid_barcode.gif')))->header('Content-type', 'image/gif');
+                        return response(file_get_contents(public_path('uploads/barcodes/invalid_barcode.gif')))->header('Content-type', 'image/gif');
+                    }
                 }
             }
         }
+        return null;
     }
 
     /**
@@ -794,21 +795,24 @@ class AssetsController extends Controller
      */
     public function getRestore($assetId = null)
     {
-        // Get asset information
-        $asset = Asset::withTrashed()->find($assetId);
-        $this->authorize('delete', $asset);
-        if (isset($asset->id)) {
-            // Restore the asset
-            Asset::withTrashed()->where('id', $assetId)->restore();
+        if ($asset = Asset::withTrashed()->find($assetId)) {
+            $this->authorize('delete', $asset);
 
-            $logaction = new Actionlog();
-            $logaction->item_type = Asset::class;
-            $logaction->item_id = $asset->id;
-            $logaction->created_at = date('Y-m-d H:i:s');
-            $logaction->user_id = Auth::user()->id;
-            $logaction->logaction('restored');
+            if ($asset->deleted_at == '') {
+                return redirect()->back()->with('error', trans('general.not_deleted', ['item_type' => trans('general.asset')]));
+            }
 
-            return redirect()->route('hardware.index')->with('success', trans('admin/hardware/message.restore.success'));
+            if ($asset->restore()) {
+                // Redirect them to the deleted page if there are more, otherwise the section index
+                $deleted_assets = Asset::onlyTrashed()->count();
+                if ($deleted_assets > 0) {
+                    return redirect()->back()->with('success', trans('admin/hardware/message.restore.success'));
+                }
+                return redirect()->route('hardware.index')->with('success', trans('admin/hardware/message.restore.success'));
+            }
+
+            // Check validation to make sure we're not restoring an asset with the same asset tag (or unique attribute) as an existing asset
+            return redirect()->back()->with('error', trans('general.could_not_restore', ['item_type' => trans('general.asset'), 'error' => $asset->getErrors()->first()]));
         }
 
         return redirect()->route('hardware.index')->with('error', trans('admin/hardware/message.does_not_exist'));
